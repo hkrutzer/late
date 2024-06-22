@@ -8,7 +8,9 @@ defmodule Late.MixProject do
       elixir: "~> 1.16",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      description: "A websocket client using MintWebsocket",
+      package: package()
     ]
   end
 
@@ -29,6 +31,17 @@ defmodule Late.MixProject do
       {:mint, "~> 1.5"},
       {:mint_web_socket, "~> 1.0"},
       {:websock_adapter, "~> 0.5.5", only: :test}
+    ]
+  end
+
+  defp package do
+    [
+      name: "late",
+      files: ~w(lib .formatter.exs mix.exs README.md),
+      licenses: ["MPL-2.0"],
+      links: %{
+        "GitHub" => "https://github.com/hkrutzer/late"
+      }
     ]
   end
 end
