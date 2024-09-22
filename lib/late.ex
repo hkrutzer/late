@@ -33,7 +33,6 @@ defmodule Late do
     :websocket,
     :request_ref,
     :resp_headers,
-    :connect_buffer,
     :state
   ]
 
@@ -145,6 +144,7 @@ defmodule Late do
     case mod.init(args) do
       {:ok, mod_state} ->
         mint_opts = Keyword.get(opts, :mint_opts, [])
+        mint_opts = Keyword.put(mint_opts, :mode, :passive)
         mint_websocket_opts = Keyword.get(opts, :mint_opts, [])
         uri = URI.parse(Keyword.get(opts, :url))
         headers = Keyword.get(opts, :headers, [])
@@ -171,16 +171,35 @@ defmodule Late do
         # TODO Make HTTP1 configurable
         with {:ok, conn} <- Mint.HTTP1.connect(http_scheme, uri.host, uri.port, mint_opts),
              {:ok, conn, ref} <-
-               Mint.WebSocket.upgrade(ws_scheme, conn, path, headers, mint_websocket_opts) do
+               Mint.WebSocket.upgrade(ws_scheme, conn, path, headers, mint_websocket_opts),
+             {:ok, conn, [{:status, ^ref, status}, {:headers, ^ref, resp_headers} | rest]} <-
+               Mint.HTTP.recv(conn, 0, connect_timeout),
+             {:ok, conn} <- Mint.HTTP.set_mode(conn, :active),
+             {:ok, conn, websocket} <- Mint.WebSocket.new(conn, ref, status, resp_headers),
+             # In some cases the data from recv might already contain
+             # the initial frames, so we decode those.
+             # To similate this happening, add a delay after Mint.WebSocket.upgrade
+             {:ok, websocket, initial_data} <- maybe_decode_initial_data(websocket, rest) do
+          initial_frames =
+            Enum.map(initial_data, &{:next_event, :internal, {:handle_frame, &1}})
+
           state = %__MODULE__{
-            request_ref: ref,
             conn: conn,
+            websocket: websocket,
+            resp_headers: resp_headers,
+            request_ref: ref,
             state: {mod, mod_state}
           }
 
-          {:ok, :connecting, state, {{:timeout, :connect_timeout}, connect_timeout, nil}}
+          {:ok, :connected, state,
+           [{:next_event, :internal, :maybe_handle_connect}] ++ initial_frames}
         else
           {:error, reason} ->
+            {:error, reason}
+
+          {:error, conn, reason, _response} ->
+            # Mint.HTTP.recv error
+            Mint.HTTP.close(conn)
             {:error, reason}
 
           {:error, conn, reason} ->
@@ -190,62 +209,18 @@ defmodule Late do
     end
   end
 
+  defp maybe_decode_initial_data(websocket, [{:done, _ref}]), do: {:ok, websocket, []}
+
+  defp maybe_decode_initial_data(websocket, [{:data, ref, data}, {:done, ref}]) do
+    Mint.WebSocket.decode(websocket, data)
+  end
+
   ## State functions
-  def connecting({:timeout, :connect_timeout}, _from, state) do
-    Mint.HTTP.close(state.conn)
-    {:stop, :connect_timeout, state}
-  end
-
-  def connecting(:info, message, %{conn: conn} = state)
-      when Mint.HTTP.is_connection_message(state.conn, message) do
-    ref = state.request_ref
-
-    {:ok, conn, [{:status, ^ref, status}, {:headers, ^ref, resp_headers} | rest]} =
-      Mint.WebSocket.stream(conn, message)
-
-    buffer =
-      case rest do
-        [{:data, ^ref, data}, {:done, ^ref}] -> data
-        [{:done, ^ref}] -> nil
-      end
-
-    case Mint.WebSocket.new(conn, ref, status, resp_headers) do
-      {:ok, conn, websocket} ->
-        state = %{
-          state
-          | conn: conn,
-            websocket: websocket,
-            resp_headers: resp_headers,
-            connect_buffer: buffer
-        }
-
-        {:next_state, :connected, state,
-         [
-           # Clear connection timeout first, then trigger event to call handle_connect
-           {{:timeout, :connect_timeout}, :cancel},
-           {:next_event, :internal, :maybe_handle_connect}
-         ]}
-
-      {:error, conn, reason} ->
-        {:stop, reason, %{state | conn: conn}}
-    end
-  end
-
-  def connecting(:info, _message, _state), do: {:keep_state_and_data, :postpone}
-  def connecting({:call, _from}, _msg, _state), do: {:keep_state_and_data, :postpone}
-
-  def maybe_prepend_buffer(%__MODULE__{connect_buffer: nil} = state, data), do: {:ok, state, data}
-
-  def maybe_prepend_buffer(%__MODULE__{connect_buffer: buffer} = state, data) do
-    {:ok, %{state | connect_buffer: nil}, buffer <> data}
-  end
-
   def connected(:info, message, state)
       when Mint.HTTP.is_connection_message(state.conn, message) do
     ref = state.request_ref
 
     with {:ok, conn, [{:data, ^ref, data}]} <- Mint.WebSocket.stream(state.conn, message),
-         {:ok, state, data} <- maybe_prepend_buffer(state, data),
          {:ok, websocket, frames} <- Mint.WebSocket.decode(state.websocket, data) do
       # Send each frame as a new action
       actions = Enum.map(frames, &{:next_event, :internal, {:handle_frame, &1}})
@@ -257,9 +232,19 @@ defmodule Late do
 
       # Handle stream errors
       {:error, conn, %Mint.TransportError{reason: :closed} = reason, _responses} ->
-        # TODO handle_disconnect
-        Logger.warning("Connection closed #{inspect(reason)}")
-        {:stop, reason, %{state | conn: conn}}
+        {mod, mod_state} = state.state
+        state = %{state | conn: conn}
+
+        # TODO Add reconnect
+        if function_exported?(mod, :handle_disconnect, 2) do
+          case apply(mod, :handle_disconnect, [reason, mod_state]) do
+            {:ok, mod_state} ->
+              state = %{state | state: {mod, mod_state}}
+              {:stop, reason, state}
+          end
+        else
+          {:stop, reason, state}
+        end
 
       {:error, conn, reason, _responses} ->
         {:stop, reason, %{state | conn: conn}}
@@ -282,6 +267,10 @@ defmodule Late do
     {:keep_state, state}
   end
 
+  def connected(:internal, {:handle_frame, {:pong, _data}}, state) do
+    {:keep_state, state}
+  end
+
   def connected(:internal, {:handle_frame, {op, text}}, state) when op in [:text, :binary] do
     {mod, mod_state} = state.state
     maybe_handle(mod, :handle_in, [{op, text}, mod_state], state)
@@ -292,7 +281,7 @@ defmodule Late do
   end
 
   def connected(:internal, {:handle_frame, frame}, _state) do
-    Logger.error("Received unknown websocket frame #{frame}")
+    Logger.error("Received unknown websocket frame #{inspect(frame)}")
     :keep_state_and_data
   end
 
@@ -323,8 +312,6 @@ defmodule Late do
   end
 
   defp send_frame(state, frame) do
-    Logger.debug("Sending #{inspect(frame)}")
-
     with {:ok, websocket, data} <- Mint.WebSocket.encode(state.websocket, frame),
          state = put_in(state.websocket, websocket),
          {:ok, conn} <- Mint.WebSocket.stream_request_body(state.conn, state.request_ref, data) do

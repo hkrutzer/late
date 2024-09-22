@@ -2,11 +2,16 @@ defmodule Late.WebsocketHandler do
   @moduledoc false
 
   def init(data) do
-    {:ok, data}
+    {:push, [{:text, "Greetings!"}, {:ping, <<>>}], data}
   end
 
   def handle_control({message, [opcode: opcode]}, state) do
     {:push, [{opcode, message}], state}
+  end
+
+  def handle_in({"kill", [opcode: :text]}, state) do
+    Process.exit(self(), :kill)
+    {:ok, state}
   end
 
   def handle_in({"normal_close", [opcode: :text]}, state) do
