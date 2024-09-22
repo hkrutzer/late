@@ -148,7 +148,7 @@ defmodule Late do
         mint_websocket_opts = Keyword.get(opts, :mint_opts, [])
         uri = URI.parse(Keyword.get(opts, :url))
         headers = Keyword.get(opts, :headers, [])
-        connect_timeout = Keyword.get(opts, :connect_timeout, 5000)
+        connect_timeout = Keyword.get(opts, :connect_timeout, 1000)
 
         {http_scheme, ws_scheme} =
           case uri.scheme do
@@ -180,26 +180,18 @@ defmodule Late do
 
           {:ok, :connecting, state, {{:timeout, :connect_timeout}, connect_timeout, nil}}
         else
-          # TODO go to disconnect state instead (allowing the callback)
           {:error, reason} ->
-            {:stop, reason}
+            {:error, reason}
 
           {:error, conn, reason} ->
             Mint.HTTP.close(conn)
-            {:stop, reason}
+            {:error, reason}
         end
     end
   end
 
-  # def terminate(reason, _state, _data)
-  # @impl true
-  # def terminate(reason, state, data) do
-  #   Logger.info("Terminating goodbye #{inspect(reason)} #{inspect(state)} #{inspect(data)}")
-  # end
-
   ## State functions
   def connecting({:timeout, :connect_timeout}, _from, state) do
-    Logger.debug("Connection time out")
     Mint.HTTP.close(state.conn)
     {:stop, :connect_timeout, state}
   end
@@ -305,17 +297,20 @@ defmodule Late do
   end
 
   def connected(:internal, {:disconnect, code, reason}, %{state: {mod, mod_state}} = state) do
+    stop_reason = if code == 1000, do: :normal, else: {:shutdown, {code, reason}}
+
+    {:ok, conn} = Mint.HTTP.close(state.conn)
+    state = %{state | conn: conn}
+
     if function_exported?(mod, :handle_disconnect, 2) do
       case apply(mod, :handle_disconnect, [{code, reason}, mod_state]) do
         # TODO Add reconnect
         {:ok, mod_state} ->
           state = %{state | state: {mod, mod_state}}
-          Mint.HTTP.close(state.conn)
-          {:stop, reason, state}
+          {:stop, stop_reason, state}
       end
     else
-      Mint.HTTP.close(state.conn)
-      {:stop, reason, state}
+      {:stop, stop_reason, state}
     end
   end
 

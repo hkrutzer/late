@@ -9,13 +9,16 @@ defmodule Late.WebsocketHandler do
     {:push, [{opcode, message}], state}
   end
 
-  def handle_in({"close it!", [opcode: :text]}, state) do
-    {:stop, :normal, {1013, "yessir"}, state}
+  def handle_in({"normal_close", [opcode: :text]}, state) do
+    {:stop, :normal, {1000, "Bye!"}, state}
+  end
+
+  def handle_in({"error_close", [opcode: :text]}, state) do
+    {:stop, :normal, {1011, "Oops"}, state}
   end
 
   def handle_in({message, [opcode: opcode]}, state) do
     send(state.test_pid, {:server_msg, {opcode, message}})
-    # {:push, [{opcode, message}], state}
     {:ok, state}
   end
 

@@ -12,10 +12,13 @@ defmodule LateTest do
 
     require Logger
 
+    def server_disconnect(pid, type) do
+      Process.send(pid, {:disconnect, type}, [])
+    end
+
     @impl true
-    def init(data) do
-      dbg(data)
-      {:ok, 0}
+    def init(init) do
+      {:ok, Enum.into(init, %{})}
     end
 
     @impl true
@@ -24,9 +27,21 @@ defmodule LateTest do
     end
 
     @impl true
+    def handle_disconnect(reason, state) do
+      Process.send(state.test_pid, {:handle_disconnect, reason}, [])
+      {:ok, state}
+    end
+
+    @impl true
     def handle_call({:test_call, msg}, from, state) do
-      Late.reply(from, :ok_u_fool)
+      Late.reply(from, :ok)
       {:reply, {:text, msg}, state}
+    end
+
+    @impl true
+    def handle_call(:disconnect, from, state) do
+      Late.reply(from, :ok)
+      {:stop, state}
     end
 
     @impl true
@@ -35,18 +50,21 @@ defmodule LateTest do
     end
 
     @impl true
+    def handle_info({:disconnect, :normal_close}, state), do: {:reply, {:text, "normal_close"}, state}
+    def handle_info({:disconnect, :error_close}, state), do: {:reply, {:text, "error_close"}, state}
+
     def handle_info(message, state) do
       Logger.info("Handle in 2 #{inspect(message)}")
-      {:reply, [{:text, "mesage one"}, {:text, message}], state}
+      {:reply, [{:text, "message one"}, {:text, message}], state}
     end
   end
 
-  test "connects to a server and sends a message" do
+  test "connects to a server and receives a message" do
     client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
 
     url =
       URI.parse("ws://localhost:8888/websocket")
-      |> URI.append_query("test_pid=#{client_pid}")
+      |> URI.append_query(URI.encode_query(%{test_pid: client_pid}))
 
     {:ok, _} =
       Late.start_link(
@@ -64,7 +82,7 @@ defmodule LateTest do
 
     url =
       URI.parse("ws://localhost:8888/websocket")
-      |> URI.append_query("test_pid=#{client_pid}")
+      |> URI.append_query(URI.encode_query(%{test_pid: client_pid}))
 
     {:ok, _} =
       Late.start_link(
@@ -79,7 +97,108 @@ defmodule LateTest do
 
   test "handles call"
 
-  test "can disconnect"
+  test "can disconnect" do
+    client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
 
-  test "handles normal disconnects"
+    url =
+      URI.parse("ws://localhost:8888/websocket")
+      |> URI.append_query(URI.encode_query(%{test_pid: client_pid}))
+
+    {:ok, pid} =
+      Late.start_link(
+        TestConnection,
+        [test_pid: self()],
+        url: URI.to_string(url),
+        debug: [:trace]
+      )
+
+    assert_receive {:server_msg, {:text, "hi"}}
+    Late.call(pid, :disconnect)
+    Process.sleep(20)
+    refute Process.alive?(pid)
+  end
+
+  test "handles normal server-side disconnects by exiting normally" do
+    client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
+
+    url =
+      URI.parse("ws://localhost:8888/websocket")
+      |> URI.append_query(URI.encode_query(%{test_pid: client_pid}))
+
+    {:ok, pid} =
+      Late.start_link(
+        TestConnection,
+        [test_pid: self()],
+        url: URI.to_string(url),
+        debug: [:trace]
+      )
+
+    TestConnection.server_disconnect(pid, :normal_close)
+    assert_receive {:handle_disconnect, {1000, "Bye!"}}
+    Process.sleep(20)
+    refute Process.alive?(pid)
+  end
+
+  test "handles abnormal server-side disconnects by exiting with error" do
+    client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
+
+    url =
+      URI.parse("ws://localhost:8888/websocket")
+      |> URI.append_query(URI.encode_query(%{test_pid: client_pid}))
+
+    Process.flag(:trap_exit, true)
+
+    {:ok, pid} =
+      Late.start_link(
+        TestConnection,
+        [test_pid: self()],
+        url: URI.to_string(url),
+        debug: [:trace]
+      )
+
+    TestConnection.server_disconnect(pid, :error_close)
+    assert_receive {:handle_disconnect, {1011, "Oops"}}
+    assert_receive {:EXIT, ^pid, {:shutdown, {1011, "Oops"}}}
+    refute Process.alive?(pid)
+  end
+
+  describe "connection failures" do
+    test "does not start when attempting to connect" do
+      {:error, %Mint.TransportError{reason: :econnrefused}} =
+        Late.start_link(
+          TestConnection,
+          [test_pid: self()],
+          url: "ws://localhost:25",
+          debug: [:trace]
+        )
+    end
+
+    test "crashes when connecting to host that offers no websocket" do
+      Process.flag(:trap_exit, true)
+
+      {:ok, pid} =
+        Late.start_link(
+          TestConnection,
+          [test_pid: self()],
+          url: "ws://localhost:8888/text",
+          debug: [:trace]
+        )
+      assert_receive {:EXIT, ^pid, %Mint.WebSocket.UpgradeFailureError{}}
+    end
+
+    test "crashes when connection times out" do
+      Process.flag(:trap_exit, true)
+
+      {:ok, pid} =
+        Late.start_link(
+          TestConnection,
+          [test_pid: self()],
+          url: "ws://localhost:8888/sleep",
+          connect_timeout: 100,
+          debug: [:trace]
+        )
+      Process.sleep(200)
+      assert_receive {:EXIT, ^pid, :connect_timeout}
+    end
+  end
 end
