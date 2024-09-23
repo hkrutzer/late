@@ -42,13 +42,13 @@ jobs:
         restore-keys: ${{ runner.os }}-mix-
     - run: mix deps.get --check-locked
     - run: mix format --check-formatted
-      if: ${{ matrix.lint }}
+      if: ${{ matrix.pair.lint }}
     - run: mix deps.unlock --check-unused
-      if: ${{ matrix.lint }}
+      if: ${{ matrix.pair.lint }}
     - run: mix deps.compile
     - run: mix compile --no-optional-deps --warnings-as-errors
-      if: ${{ matrix.lint }}
+      if: ${{ matrix.pair.lint }}
     - run: mix test --slowest 5
-      if: ${{ ! matrix.lint }}
+      if: ${{ ! matrix.pair.lint }}
     - run: mix test --slowest 5 --warnings-as-errors
-      if: ${{ matrix.lint }}
+      if: ${{ matrix.pair.lint }}
