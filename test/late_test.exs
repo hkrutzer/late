@@ -220,6 +220,7 @@ defmodule LateTest do
         )
 
       Process.flag(:trap_exit, true)
+
       {%Mint.TransportError{reason: :closed}, _} =
         catch_exit(Late.call(pid, :kill_server_worker))
     end
