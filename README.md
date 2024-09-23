@@ -74,7 +74,7 @@ end
 ```elixir
 def deps do
   [
-    {:late, "~> 0.1.0"}
+    {:late, "~> 0.2.0"}
   ]
 end
 ```
