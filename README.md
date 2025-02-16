@@ -1,5 +1,8 @@
 # Late
 
+[![Documentation badge](https://img.shields.io/badge/Hexdocs-ff6900)](https://hexdocs.pm/late/)
+[![Hex.pm badge](https://img.shields.io/badge/hex.pm-informational)](https://hex.pm/packages/late)
+
 Late is a websocket client library for Elixir using Mint and `:gen_statem`.
 
 It features asynchronous and synchronous calls, checking for connection errors during process init, and a simple API.
