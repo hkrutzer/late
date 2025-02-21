@@ -10,7 +10,8 @@ defmodule Late.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: "A websocket client using MintWebsocket",
-      package: package()
+      package: package(),
+      test_coverage: [ignore_modules: [~r(Late.Test.*)]]
     ]
   end
 
