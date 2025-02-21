@@ -1,4 +1,4 @@
-defmodule Late.WebsocketHandler do
+defmodule Late.TestWebsocketHandler do
   @moduledoc false
 
   def init(data) do
