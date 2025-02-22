@@ -59,17 +59,29 @@ defmodule Late do
   """
   @callback handle_connect(Mint.Types.headers(), state) :: call_result
 
-  # @doc """
-  # Invoked after disconnecting.
-  # """
+  @doc """
+  Invoked after disconnecting.
+  """
   @callback handle_disconnect(disconnect_reason, state) :: {:ok, state}
 
-  @callback handle_in(frame, state) :: call_result
+  @doc """
+  Invoked when the server receives a call message sent by `Late.call/3`.
 
+  You must reply to the calling process using `Late.reply/2`.
+  Returning a `{:reply, [frame], state}` tuple will send the frames to the WebSocket server,
+  not the calling process.
+  """
   @callback handle_call(term, {pid, term}, state) :: call_result
 
-  @callback handle_info(any(), state) :: call_result
+  @doc """
+  Invoked when the server receives a WebSocket frame.
+  """
+  @callback handle_in(frame, state) :: call_result
 
+  @doc """
+  Invoked when the server receives any message that is not a call or WebSocket frame.
+  """
+  @callback handle_info(any(), state) :: call_result
   @optional_callbacks handle_call: 3,
                       handle_disconnect: 2,
                       handle_info: 2,
@@ -77,11 +89,10 @@ defmodule Late do
                       handle_in: 2
 
   @doc """
-  Replies to the given client.
+  Replies to the given `Late.call/3` caller.
 
   Wrapper for `:gen_statem.reply/2`.
   """
-  # def reply({caller_pid, from} = _from, reply) when is_pid(caller_pid) do
   def reply(from, reply) do
     :gen_statem.reply(from, reply)
   end
@@ -216,6 +227,7 @@ defmodule Late do
   end
 
   ## State functions
+  @doc false
   def connected(:info, message, state)
       when Mint.HTTP.is_connection_message(state.conn, message) do
     ref = state.request_ref

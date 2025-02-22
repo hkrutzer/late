@@ -11,7 +11,15 @@ defmodule Late.MixProject do
       deps: deps(),
       description: "A websocket client using MintWebsocket",
       package: package(),
-      test_coverage: [ignore_modules: [~r(Late.Test.*)]]
+      test_coverage: [ignore_modules: [~r(Late.Test.*)]],
+      source_url: "https://github.com/hkrutzer/late",
+      source_ref: "master",
+      docs: [
+        main: "readme",
+        extras: [
+          "README.md": [title: "Introduction"]
+        ]
+      ]
     ]
   end
 

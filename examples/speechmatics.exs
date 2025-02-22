@@ -70,7 +70,7 @@ defmodule SpeechmaticsConnection do
   @impl true
   def handle_info(message, state) do
     Logger.info("Handle in 2 #{inspect(message)}")
-    {:reply, [{:text, "mesage one"}, {:text, message}], state}
+    {:reply, [{:text, "message one"}, {:text, message}], state}
   end
 
   @impl true
