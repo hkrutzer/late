@@ -22,7 +22,7 @@ defmodule LateTest do
     end
 
     @impl true
-    def handle_connect(state) do
+    def handle_connect(_headers, state) do
       {:reply, {:text, "hi"}, state}
     end
 
@@ -126,6 +126,40 @@ defmodule LateTest do
     Late.call(pid, :disconnect)
     Process.sleep(20)
     refute Process.alive?(pid)
+  end
+
+  test "can read headers" do
+    client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
+
+    defmodule TestHeadersConnection do
+      @behaviour Late
+
+      @impl true
+      def init(init) do
+        {:ok, Enum.into(init, %{})}
+      end
+
+      @impl true
+      def handle_connect(headers, state) do
+        Process.send(state.test_pid, {:headers, headers}, [])
+        {:stop, state}
+      end
+    end
+
+    url =
+      URI.parse("ws://localhost:8888/websocket")
+      |> URI.append_query(URI.encode_query(%{test_pid: client_pid}))
+
+    {:ok, _pid} =
+      Late.start_link(
+        TestHeadersConnection,
+        [test_pid: self()],
+        url: URI.to_string(url)
+      )
+
+    assert_receive {:headers, headers}
+    headers = Enum.into(headers, %{})
+    assert headers["x-test-header"] == "123"
   end
 
   test "handles normal server-side disconnects by exiting normally" do

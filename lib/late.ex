@@ -57,7 +57,7 @@ defmodule Late do
   @doc """
   Invoked after connecting or reconnecting.
   """
-  @callback handle_connect(state) :: call_result
+  @callback handle_connect(Mint.Types.headers(), state) :: call_result
 
   # @doc """
   # Invoked after disconnecting.
@@ -73,7 +73,7 @@ defmodule Late do
   @optional_callbacks handle_call: 3,
                       handle_disconnect: 2,
                       handle_info: 2,
-                      handle_connect: 1,
+                      handle_connect: 2,
                       handle_in: 2
 
   @doc """
@@ -259,7 +259,7 @@ defmodule Late do
   end
 
   def connected(:internal, :maybe_handle_connect, %{state: {mod, mod_state}} = state) do
-    maybe_handle(mod, :handle_connect, [mod_state], state)
+    maybe_handle(mod, :handle_connect, [state.resp_headers, mod_state], state)
   end
 
   def connected(:internal, {:handle_frame, {:ping, data}}, state) do

@@ -30,6 +30,7 @@ defmodule Late.TestRouter do
       |> :erlang.binary_to_term()
 
     conn
+    |> put_resp_header("x-test-header", "123")
     |> WebSockAdapter.upgrade(Late.TestWebsocketHandler, %{test_pid: test_pid},
       timeout: :infinity
     )
