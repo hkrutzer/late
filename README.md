@@ -75,6 +75,6 @@ end
 ## Installation
 
 ```elixir
-{:late, "~> 0.2.0"},
+{:late, "~> 0.3.0"},
 ```
 
