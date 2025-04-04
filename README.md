@@ -5,7 +5,7 @@
 
 Late is a websocket client library for Elixir using Mint and `:gen_statem`.
 
-It features a simple design, synchronous and synchronous calls and handling connection errors during process init instead of after startup.
+It features a simple design, synchronous and asynchronous calls and handling connection errors during process init instead of after startup.
 
 ## Usage
 
