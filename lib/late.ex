@@ -48,6 +48,7 @@ defmodule Late do
 
   @type disconnect_reason ::
           {:close, code :: non_neg_integer() | nil, reason :: binary() | nil}
+          | Mint.TransportError.t()
 
   @doc """
 
