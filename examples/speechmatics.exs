@@ -10,7 +10,7 @@ defmodule SpeechmaticsConnection do
   end
 
   @impl true
-  def handle_connect(state) do
+  def handle_connect(_headers, state) do
     {:ok, state}
   end
 
