@@ -53,5 +53,7 @@ jobs:
       if: ${{ matrix.pair.lint }}
     - run: mix test --slowest 5
       if: ${{ ! matrix.pair.lint }}
-    - run: mix test --slowest 5 --warnings-as-errors
+    - run: mix coveralls.github --slowest 5 --warnings-as-errors
       if: ${{ matrix.pair.lint }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

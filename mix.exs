@@ -12,7 +12,15 @@ defmodule Late.MixProject do
       description: "A websocket client using MintWebsocket",
       package: package(),
       test_coverage: [
+        tool: ExCoveralls,
         ignore_modules: [~r(Late.Test*)]
+      ],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.github": :test
       ],
       source_url: "https://github.com/hkrutzer/late",
       source_ref: "master",
@@ -41,7 +49,8 @@ defmodule Late.MixProject do
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:mint, "~> 1.5"},
       {:mint_web_socket, "~> 1.0"},
-      {:websock_adapter, "~> 0.5.5", only: :test}
+      {:websock_adapter, "~> 0.5.5", only: :test},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 

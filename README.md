@@ -2,6 +2,7 @@
 
 [![Documentation badge](https://img.shields.io/badge/Hexdocs-ff6900)](https://hexdocs.pm/late/)
 [![Hex.pm badge](https://img.shields.io/badge/hex.pm-informational)](https://hex.pm/packages/late)
+[![Coverage Status](https://coveralls.io/repos/github/hkrutzer/late/badge.svg?branch=master)](https://coveralls.io/github/hkrutzer/late?branch=master)
 
 Late is a websocket client library for Elixir using Mint and `:gen_statem`.
 
