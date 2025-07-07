@@ -39,7 +39,6 @@ defmodule Late.MixProject do
       {:bandit, "~> 1.2", only: :test},
       {:castore, "~> 1.0", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:jason, "~> 1.2", only: :dev},
       {:mint, "~> 1.5"},
       {:mint_web_socket, "~> 1.0"},
       {:websock_adapter, "~> 0.5.5", only: :test}
