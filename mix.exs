@@ -15,13 +15,6 @@ defmodule Late.MixProject do
         tool: ExCoveralls,
         ignore_modules: [~r(Late.Test*)]
       ],
-      preferred_cli_env: [
-        coveralls: :test,
-        "coveralls.detail": :test,
-        "coveralls.post": :test,
-        "coveralls.html": :test,
-        "coveralls.github": :test
-      ],
       source_url: "https://github.com/hkrutzer/late",
       source_ref: "master",
       docs: [
@@ -33,8 +26,20 @@ defmodule Late.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: [~c"lib", ~c"test/support"]
-  defp elixirc_paths(_), do: [~c"lib"]
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.github": :test
+      ]
+    ]
+  end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   def application do
     [
