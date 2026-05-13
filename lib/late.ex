@@ -157,7 +157,7 @@ defmodule Late do
       {:ok, mod_state} ->
         mint_opts = Keyword.get(opts, :mint_opts, [])
         mint_opts = Keyword.put(mint_opts, :mode, :passive)
-        mint_websocket_opts = Keyword.get(opts, :mint_opts, [])
+        mint_websocket_opts = Keyword.get(opts, :websocket_opts, [])
         uri = URI.parse(Keyword.get(opts, :url))
         headers = Keyword.get(opts, :headers, [])
         connect_timeout = Keyword.get(opts, :connect_timeout, 1000)
