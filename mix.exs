@@ -50,11 +50,10 @@ defmodule Late.MixProject do
   defp deps do
     [
       {:bandit, "~> 1.2", only: :test},
-      {:castore, "~> 1.0", only: :dev},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:mint, "~> 1.5"},
       {:mint_web_socket, "~> 1.0"},
-      {:websock_adapter, "~> 0.5.5", only: :test},
+      {:websock_adapter, "~> 0.6", only: :test},
       {:excoveralls, "~> 0.18", only: :test}
     ]
   end
