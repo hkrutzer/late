@@ -81,8 +81,7 @@ defmodule LateTest do
       Late.start_link(
         TestConnection,
         [test_pid: self()],
-        url: URI.to_string(url),
-        debug: [:trace]
+        url: URI.to_string(url)
       )
 
     assert_receive {:handle_in, {:text, "Greetings!"}}
@@ -100,8 +99,7 @@ defmodule LateTest do
       Late.start_link(
         TestConnection,
         [test_pid: self()],
-        url: URI.to_string(url),
-        debug: [:trace]
+        url: URI.to_string(url)
       )
 
     assert_receive {:server_msg, {:text, "hi"}}
@@ -118,8 +116,7 @@ defmodule LateTest do
       Late.start_link(
         TestConnection,
         [test_pid: self()],
-        url: URI.to_string(url),
-        debug: [:trace]
+        url: URI.to_string(url)
       )
 
     assert_receive {:server_msg, {:text, "hi"}}
@@ -173,8 +170,7 @@ defmodule LateTest do
       Late.start_link(
         TestConnection,
         [test_pid: self()],
-        url: URI.to_string(url),
-        debug: [:trace]
+        url: URI.to_string(url)
       )
 
     TestConnection.server_disconnect(pid, :normal_close)
@@ -196,8 +192,7 @@ defmodule LateTest do
       Late.start_link(
         TestConnection,
         [test_pid: self()],
-        url: URI.to_string(url),
-        debug: [:trace]
+        url: URI.to_string(url)
       )
 
     TestConnection.server_disconnect(pid, :error_close)
@@ -212,8 +207,7 @@ defmodule LateTest do
         Late.start_link(
           TestConnection,
           [test_pid: self()],
-          url: "ws://localhost:25",
-          debug: [:trace]
+          url: "ws://localhost:25"
         )
     end
 
@@ -222,8 +216,7 @@ defmodule LateTest do
         Late.start_link(
           TestConnection,
           [test_pid: self()],
-          url: "ws://localhost:8888/text",
-          debug: [:trace]
+          url: "ws://localhost:8888/text"
         )
     end
 
@@ -233,8 +226,7 @@ defmodule LateTest do
           TestConnection,
           [test_pid: self()],
           url: "ws://localhost:8888/sleep",
-          connect_timeout: 100,
-          debug: [:trace]
+          connect_timeout: 100
         )
     end
 
@@ -249,8 +241,7 @@ defmodule LateTest do
         Late.start_link(
           TestConnection,
           [test_pid: self()],
-          url: URI.to_string(url),
-          debug: [:trace]
+          url: URI.to_string(url)
         )
 
       Process.flag(:trap_exit, true)
