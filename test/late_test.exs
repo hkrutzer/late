@@ -1,16 +1,11 @@
 defmodule LateTest do
   use ExUnit.Case
-  doctest Late
+  import ExUnit.CaptureLog
 
-  setup_all do
-    Late.TestServer.start(8888)
-    :ok
-  end
+  doctest Late
 
   defmodule TestConnection do
     @behaviour Late
-
-    require Logger
 
     def server_disconnect(pid, type) do
       Process.send(pid, {:disconnect, type}, [])
@@ -65,7 +60,6 @@ defmodule LateTest do
       do: {:reply, {:text, "error_close"}, state}
 
     def handle_info(message, state) do
-      Logger.info("Handle in 2 #{inspect(message)}")
       {:reply, [{:text, "message one"}, {:text, message}], state}
     end
   end
@@ -75,6 +69,21 @@ defmodule LateTest do
 
     @impl true
     def init(state), do: {:ok, state}
+  end
+
+  defmodule TestHeadersConnection do
+    @behaviour Late
+
+    @impl true
+    def init(init) do
+      {:ok, Enum.into(init, %{})}
+    end
+
+    @impl true
+    def handle_connect(headers, state) do
+      Process.send(state.test_pid, {:headers, headers}, [])
+      {:stop, state}
+    end
   end
 
   test "connects to a server and send and receive a message" do
@@ -153,21 +162,6 @@ defmodule LateTest do
 
   test "can read headers" do
     client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
-
-    defmodule TestHeadersConnection do
-      @behaviour Late
-
-      @impl true
-      def init(init) do
-        {:ok, Enum.into(init, %{})}
-      end
-
-      @impl true
-      def handle_connect(headers, state) do
-        Process.send(state.test_pid, {:headers, headers}, [])
-        {:stop, state}
-      end
-    end
 
     url =
       URI.parse("ws://localhost:8888/websocket")
@@ -286,8 +280,10 @@ defmodule LateTest do
 
       Process.flag(:trap_exit, true)
 
-      {%Mint.TransportError{reason: :closed}, _} =
-        catch_exit(Late.call(pid, :kill_server_worker))
+      capture_log(fn ->
+        {%Mint.TransportError{reason: :closed}, _} =
+          catch_exit(Late.call(pid, :kill_server_worker))
+      end)
     end
 
     test "exits with the send error when a callback cannot send its reply" do
@@ -295,7 +291,7 @@ defmodule LateTest do
 
       url =
         URI.parse("ws://localhost:8888/websocket")
-        |> URI.append_query(URI.encode_query(%{test_pid: client_pid}))
+        |> URI.append_query(URI.encode_query(%{test_pid: client_pid, send_ping: false}))
 
       Process.flag(:trap_exit, true)
 

@@ -29,11 +29,14 @@ defmodule Late.TestRouter do
       Base.decode64!(conn.query_params["test_pid"])
       |> :erlang.binary_to_term()
 
+    websocket_state = %{
+      test_pid: test_pid,
+      send_ping?: conn.query_params["send_ping"] != "false"
+    }
+
     conn
     |> put_resp_header("x-test-header", "123")
-    |> WebSockAdapter.upgrade(Late.TestWebsocketHandler, %{test_pid: test_pid},
-      timeout: :infinity
-    )
+    |> WebSockAdapter.upgrade(Late.TestWebsocketHandler, websocket_state, timeout: :infinity)
     |> halt()
   end
 end

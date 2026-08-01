@@ -1,8 +1,12 @@
 defmodule Late.TestWebsocketHandler do
   @moduledoc false
 
-  def init(data) do
+  def init(%{send_ping?: true} = data) do
     {:push, [{:text, "Greetings!"}, {:ping, <<>>}], data}
+  end
+
+  def init(data) do
+    {:push, {:text, "Greetings!"}, data}
   end
 
   def handle_control({message, [opcode: opcode]}, state) do
