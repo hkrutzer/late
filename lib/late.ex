@@ -313,6 +313,12 @@ defmodule Late do
   def connected(:internal, {:disconnect, code, reason}, %{state: {mod, mod_state}} = state) do
     stop_reason = if code == 1000, do: :normal, else: {:shutdown, {code, reason}}
 
+    state =
+      case send_frame(state, {:close, code, reason}) do
+        {:ok, state} -> state
+        {:error, state, _reason} -> state
+      end
+
     {:ok, conn} = Mint.HTTP.close(state.conn)
     state = %{state | conn: conn}
 
