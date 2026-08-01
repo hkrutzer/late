@@ -244,12 +244,16 @@ defmodule Late do
             query -> uri.path <> "?" <> query
           end
 
+        # `connect_timeout` is a budget for the whole handshake, so the deadline
+        # starts before connecting rather than being restarted per step.
+        deadline = System.monotonic_time(:millisecond) + connect_timeout
+
         # TODO Make HTTP1 configurable
         with {:ok, conn} <- Mint.HTTP1.connect(http_scheme, uri.host, uri.port, mint_opts),
              {:ok, conn, ref} <-
                Mint.WebSocket.upgrade(ws_scheme, conn, path, headers, mint_websocket_opts),
-             {:ok, conn, [{:status, ^ref, status}, {:headers, ^ref, resp_headers} | rest]} <-
-               Mint.HTTP.recv(conn, 0, connect_timeout),
+             {:ok, conn, status, resp_headers, rest} <-
+               recv_upgrade_response(conn, ref, deadline),
              {:ok, conn} <- Mint.HTTP.set_mode(conn, :active),
              {:ok, conn, websocket} <- Mint.WebSocket.new(conn, ref, status, resp_headers),
              # In some cases the data from recv might already contain
@@ -282,6 +286,29 @@ defmodule Late do
             Mint.HTTP.close(conn)
             {:error, reason}
         end
+    end
+  end
+
+  # The upgrade response can be split over several TCP packets, so keep
+  # receiving until Mint has parsed both the status and the headers. Mint emits
+  # the 101's `:headers` and `:done` in the same pass, so once those are in
+  # hand the remaining responses are the complete rest of the response.
+  defp recv_upgrade_response(conn, ref, deadline) do
+    recv_until_response(conn, ref, deadline, [])
+  end
+
+  defp recv_until_response(conn, ref, _deadline, [
+         {:status, ref, status},
+         {:headers, ref, resp_headers} | rest
+       ]) do
+    {:ok, conn, status, resp_headers, rest}
+  end
+
+  defp recv_until_response(conn, ref, deadline, responses) do
+    timeout = max(deadline - System.monotonic_time(:millisecond), 0)
+
+    with {:ok, conn, more} <- Mint.HTTP.recv(conn, 0, timeout) do
+      recv_until_response(conn, ref, deadline, responses ++ more)
     end
   end
 

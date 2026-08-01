@@ -70,6 +70,13 @@ defmodule LateTest do
     end
   end
 
+  defmodule ConnectOnlyConnection do
+    @behaviour Late
+
+    @impl true
+    def init(state), do: {:ok, state}
+  end
+
   test "connects to a server and send and receive a message" do
     client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
 
@@ -249,6 +256,20 @@ defmodule LateTest do
         )
     end
 
+    test "connects when the upgrade response is split across TCP messages" do
+      {server, port} = start_split_upgrade_server()
+      on_exit(fn -> send(server, :stop) end)
+
+      assert {:ok, pid} =
+               Late.start_link(
+                 ConnectOnlyConnection,
+                 [],
+                 url: "ws://localhost:#{port}/websocket"
+               )
+
+      :ok = :gen_statem.stop(pid)
+    end
+
     test "exits when the connection is closed" do
       client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
 
@@ -313,6 +334,76 @@ defmodule LateTest do
     :sys.replace_state(pid, fn
       {:connected, state} -> {:connected, fun.(state)}
       state -> fun.(state)
+    end)
+  end
+
+  defp start_split_upgrade_server do
+    test_pid = self()
+
+    server =
+      spawn(fn ->
+        {:ok, listen_socket} =
+          :gen_tcp.listen(0, [:binary, active: false, packet: :raw, reuseaddr: true])
+
+        {:ok, {_address, port}} = :inet.sockname(listen_socket)
+        send(test_pid, {:split_upgrade_server, self(), port})
+
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        :ok = :gen_tcp.close(listen_socket)
+        {:ok, request} = recv_http_request(socket, "")
+
+        websocket_key = websocket_key(request)
+
+        websocket_accept =
+          :crypto.hash(:sha, websocket_key <> "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
+          |> Base.encode64()
+
+        :ok = :gen_tcp.send(socket, "HTTP/1.1 101 Switching Protocols\r\n")
+        Process.sleep(100)
+
+        _ =
+          :gen_tcp.send(socket, [
+            "Upgrade: websocket\r\n",
+            "Connection: Upgrade\r\n",
+            "Sec-WebSocket-Accept: ",
+            websocket_accept,
+            "\r\n\r\n"
+          ])
+
+        receive do
+          :stop -> :ok
+        after
+          1_000 -> :ok
+        end
+
+        :gen_tcp.close(socket)
+      end)
+
+    receive do
+      {:split_upgrade_server, ^server, port} -> {server, port}
+    end
+  end
+
+  defp recv_http_request(socket, acc) do
+    if String.contains?(acc, "\r\n\r\n") do
+      {:ok, acc}
+    else
+      case :gen_tcp.recv(socket, 0, 1_000) do
+        {:ok, data} -> recv_http_request(socket, acc <> data)
+        error -> error
+      end
+    end
+  end
+
+  defp websocket_key(request) do
+    Enum.find_value(String.split(request, "\r\n"), fn header ->
+      case String.split(header, ":", parts: 2) do
+        [name, value] ->
+          if String.downcase(name) == "sec-websocket-key", do: String.trim(value)
+
+        _other ->
+          nil
+      end
     end)
   end
 end
