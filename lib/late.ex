@@ -419,8 +419,12 @@ defmodule Late do
         {:keep_state, %{state | state: {mod, mod_state}}}
 
       {:reply, reply, mod_state} ->
-        {:ok, state} = send_frames(state, List.wrap(reply))
-        {:keep_state, %{state | state: {mod, mod_state}}}
+        state = %{state | state: {mod, mod_state}}
+
+        case send_frames(state, List.wrap(reply)) do
+          {:ok, state} -> {:keep_state, state}
+          {:error, state, reason} -> {:stop, reason, state}
+        end
 
       {:stop, mod_state} ->
         stop(mod, mod_state, :normal, state)

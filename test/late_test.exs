@@ -249,5 +249,51 @@ defmodule LateTest do
       {%Mint.TransportError{reason: :closed}, _} =
         catch_exit(Late.call(pid, :kill_server_worker))
     end
+
+    test "exits with the send error when a callback cannot send its reply" do
+      client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
+
+      url =
+        URI.parse("ws://localhost:8888/websocket")
+        |> URI.append_query(URI.encode_query(%{test_pid: client_pid}))
+
+      Process.flag(:trap_exit, true)
+
+      capture_log(fn ->
+        {:ok, pid} =
+          Late.start_link(
+            TestConnection,
+            [test_pid: self()],
+            url: URI.to_string(url)
+          )
+
+        assert_receive {:server_msg, {:text, "hi"}}
+
+        state = get_connection_state(pid)
+        {:ok, closed_conn} = Mint.HTTP.close(state.conn)
+
+        replace_connection_state(pid, fn state ->
+          %{state | conn: closed_conn}
+        end)
+
+        send(pid, :trigger_send)
+
+        assert_receive {:EXIT, ^pid, %Mint.TransportError{reason: :closed}}
+      end)
+    end
+  end
+
+  defp get_connection_state(pid) do
+    case :sys.get_state(pid) do
+      {:connected, state} -> state
+      state -> state
+    end
+  end
+
+  defp replace_connection_state(pid, fun) do
+    :sys.replace_state(pid, fn
+      {:connected, state} -> {:connected, fun.(state)}
+      state -> fun.(state)
+    end)
   end
 end
