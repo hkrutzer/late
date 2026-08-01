@@ -122,9 +122,7 @@ defmodule Late do
   Wrapper for `:gen_statem.call/3`.
   """
   def call(server, message, timeout \\ 5000) do
-    with {__MODULE__, reason} <- :gen_statem.call(server, message, timeout) do
-      exit({reason, {__MODULE__, :call, [server, message, timeout]}})
-    end
+    :gen_statem.call(server, message, timeout)
   end
 
   @doc false
