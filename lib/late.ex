@@ -324,8 +324,10 @@ defmodule Late do
   end
 
   def connected(:internal, {:handle_frame, {:ping, data}}, state) do
-    {:ok, state} = send_frame(state, {:pong, data})
-    {:keep_state, state}
+    case send_frame(state, {:pong, data}) do
+      {:ok, state} -> {:keep_state, state}
+      {:error, state, reason} -> {:stop, reason, state}
+    end
   end
 
   def connected(:internal, {:handle_frame, {:pong, _data}}, state) do
