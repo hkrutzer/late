@@ -21,7 +21,8 @@ defmodule TestConnection do
   end
 
   def send_async(pid, message) do
-    Process.send(pid, message, [])
+    send(pid, message)
+    :ok
   end
 
   @impl true
@@ -30,14 +31,14 @@ defmodule TestConnection do
   end
 
   @impl true
-  def handle_connect(state) do
-    Logger.info("Connected")
+  def handle_connect(headers, state) do
+    Logger.info("Connected with headers: #{inspect(headers)}")
     {:reply, {:text, "hi"}, state}
   end
 
   @impl true
-  def handle_disconnect(state, reason) do
-    Logger.info("Disconnected! #{inspect reason}")
+  def handle_disconnect(reason, state) do
+    Logger.info("Disconnected! #{inspect(reason)}")
     {:ok, state}
   end
 
@@ -76,6 +77,6 @@ end
 ## Installation
 
 ```elixir
-{:late, "~> 0.3.0"},
+{:late, "~> 0.3.0"}
 ```
 

@@ -1,26 +1,40 @@
 defmodule Late do
   @moduledoc ~S"""
+  A WebSocket client built on Mint and `:gen_statem`.
 
-  ## Example
+  A connection module implements the `Late` behaviour and keeps its own
+  callback state:
 
       defmodule MyConnection do
         @behaviour Late
 
         @impl true
-        def init(_args) do
-          {:ok, %{from: nil}}
+        def init(_args), do: {:ok, %{messages: []}}
+
+        @impl true
+        def handle_connect(_headers, state) do
+          {:reply, {:text, "hello"}, state}
         end
 
         @impl true
-        def handle_call({:something, query}, from, state) do
-          {:noreply, stuff}
+        def handle_call({:send, message}, from, state) do
+          Late.reply(from, :ok)
+          {:reply, {:text, message}, state}
         end
 
         @impl true
         def handle_in({:text, text}, state) do
-          {:reply, [frame], new_state}
+          {:ok, %{state | messages: [text | state.messages]}}
         end
       end
+
+      {:ok, pid} =
+        Late.start_link(MyConnection, [], url: "ws://localhost:3000/websocket")
+
+      :ok = Late.call(pid, {:send, "message"})
+
+  Callback replies of the form `{:reply, frame_or_frames, state}` send
+  WebSocket frames. Calls must be answered explicitly with `reply/2`.
   """
   @behaviour :gen_statem
 
@@ -52,17 +66,20 @@ defmodule Late do
           | Mint.TransportError.t()
 
   @doc """
-
+  Initializes the connection module's callback state before connecting.
   """
   @callback init(term) :: {:ok, state}
 
   @doc """
-  Invoked after connecting or reconnecting.
+  Invoked with the upgrade response headers after connecting or reconnecting.
   """
   @callback handle_connect(Mint.Types.headers(), state) :: call_result
 
   @doc """
   Invoked after disconnecting.
+
+  A server close frame is reported as `{:close, code, reason}`. Transport
+  failures are reported as `Mint.TransportError` structs.
   """
   @callback handle_disconnect(disconnect_reason, state) :: {:ok, state}
 
@@ -115,6 +132,24 @@ defmodule Late do
     %{id: __MODULE__, start: {__MODULE__, :start_link, opts}}
   end
 
+  @doc """
+  Starts a linked WebSocket connection using `module` as its callback module.
+
+  The callback module is initialized with `args` before the connection is
+  opened.
+
+  ## Options
+
+    * `:url` - required WebSocket URL using the `ws` or `wss` scheme
+    * `:headers` - request headers sent during the WebSocket upgrade
+    * `:connect_timeout` - timeout in milliseconds for connecting and receiving
+      the upgrade response; defaults to `1000`
+    * `:mint_opts` - options passed to `Mint.HTTP1.connect/4`
+    * `:websocket_opts` - options passed to `Mint.WebSocket.upgrade/5`
+    * `:name` - a local atom, `{:global, term}`, or `{:via, module, term}` name
+    * `:hibernate_after`, `:debug`, and `:spawn_opt` - options passed to
+      `:gen_statem.start_link/4`
+  """
   def start_link(module, args, opts) do
     {gen_statem_opts, opts} = Keyword.split(opts, [:hibernate_after, :debug, :spawn_opt])
     start_args = {module, args, opts}

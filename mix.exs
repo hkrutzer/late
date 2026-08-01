@@ -61,7 +61,7 @@ defmodule Late.MixProject do
   defp package do
     [
       name: "late",
-      files: ~w(lib .formatter.exs mix.exs README.md),
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE),
       licenses: ["MPL-2.0"],
       links: %{
         "GitHub" => "https://github.com/hkrutzer/late"
