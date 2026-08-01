@@ -155,12 +155,24 @@ defmodule Late do
   def init({mod, args, opts}) do
     case mod.init(args) do
       {:ok, mod_state} ->
+        connect_timeout = Keyword.get(opts, :connect_timeout, 1000)
+
         mint_opts = Keyword.get(opts, :mint_opts, [])
         mint_opts = Keyword.put(mint_opts, :mode, :passive)
+
+        mint_opts =
+          Keyword.update(
+            mint_opts,
+            :transport_opts,
+            [timeout: connect_timeout],
+            fn transport_opts ->
+              Keyword.put_new(transport_opts, :timeout, connect_timeout)
+            end
+          )
+
         mint_websocket_opts = Keyword.get(opts, :websocket_opts, [])
         uri = URI.parse(Keyword.get(opts, :url))
         headers = Keyword.get(opts, :headers, [])
-        connect_timeout = Keyword.get(opts, :connect_timeout, 1000)
 
         {http_scheme, ws_scheme} =
           case uri.scheme do
