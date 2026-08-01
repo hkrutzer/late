@@ -31,7 +31,8 @@ defmodule Late.TestWebsocketHandler do
     {:ok, state}
   end
 
-  def terminate(_reason, state) do
+  def terminate(reason, state) do
+    send(state.test_pid, {:server_terminate, reason})
     {:ok, state}
   end
 end

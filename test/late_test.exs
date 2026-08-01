@@ -125,6 +125,25 @@ defmodule LateTest do
     refute Process.alive?(pid)
   end
 
+  test "sends a close frame when the connection process terminates" do
+    client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
+
+    url =
+      URI.parse("ws://localhost:8888/websocket")
+      |> URI.append_query(URI.encode_query(%{test_pid: client_pid}))
+
+    {:ok, pid} =
+      Late.start_link(
+        TestConnection,
+        [test_pid: self()],
+        url: URI.to_string(url)
+      )
+
+    assert_receive {:server_msg, {:text, "hi"}}
+    :ok = :gen_statem.stop(pid)
+    assert_receive {:server_terminate, :remote}
+  end
+
   test "can read headers" do
     client_pid = :erlang.term_to_binary(self()) |> Base.encode64()
 

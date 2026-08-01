@@ -182,6 +182,24 @@ defmodule Late do
   @impl :gen_statem
   def callback_mode, do: :state_functions
 
+  @doc false
+  @impl :gen_statem
+  def terminate(_reason, _state_name, %__MODULE__{conn: nil}), do: :ok
+
+  def terminate(_reason, _state_name, %__MODULE__{} = state) do
+    if Mint.HTTP.open?(state.conn) do
+      state =
+        case send_frame(state, :close) do
+          {:ok, state} -> state
+          {:error, state, _reason} -> state
+        end
+
+      _ = Mint.HTTP.close(state.conn)
+    end
+
+    :ok
+  end
+
   ## Init callbacks
 
   @doc false
@@ -425,16 +443,10 @@ defmodule Late do
         end
 
       {:stop, mod_state} ->
-        stop(mod, mod_state, :normal, state)
+        {:stop, :normal, %{state | state: {mod, mod_state}}}
 
       {:stop, reason, mod_state} ->
-        stop(mod, mod_state, reason, state)
+        {:stop, reason, %{state | state: {mod, mod_state}}}
     end
-  end
-
-  defp stop(mod, mod_state, reason, state) do
-    _ = send_frame(state, :close)
-    Mint.HTTP.close(state.conn)
-    {:stop, reason, %{state | state: {mod, mod_state}}}
   end
 end
