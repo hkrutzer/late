@@ -43,8 +43,9 @@ defmodule Late do
 
   @type call_result ::
           {:ok, state}
-          | {:reply, [frame], state}
-          | {:stop, any(), state}
+          | {:reply, frame | [frame], state}
+          | {:stop, state}
+          | {:stop, reason :: term(), state}
 
   @type disconnect_reason ::
           {:close, code :: non_neg_integer() | nil, reason :: binary() | nil}
@@ -385,9 +386,16 @@ defmodule Late do
         {:keep_state, %{state | state: {mod, mod_state}}}
 
       {:stop, mod_state} ->
-        _ = send_frame(state, :close)
-        Mint.HTTP.close(state.conn)
-        {:stop, :normal, %{state | state: {mod, mod_state}}}
+        stop(mod, mod_state, :normal, state)
+
+      {:stop, reason, mod_state} ->
+        stop(mod, mod_state, reason, state)
     end
+  end
+
+  defp stop(mod, mod_state, reason, state) do
+    _ = send_frame(state, :close)
+    Mint.HTTP.close(state.conn)
+    {:stop, reason, %{state | state: {mod, mod_state}}}
   end
 end
