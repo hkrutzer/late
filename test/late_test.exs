@@ -174,7 +174,7 @@ defmodule LateTest do
       )
 
     TestConnection.server_disconnect(pid, :normal_close)
-    assert_receive {:handle_disconnect, {1000, "Bye!"}}
+    assert_receive {:handle_disconnect, {:close, 1000, "Bye!"}}
     Process.sleep(20)
     refute Process.alive?(pid)
   end
@@ -196,7 +196,7 @@ defmodule LateTest do
       )
 
     TestConnection.server_disconnect(pid, :error_close)
-    assert_receive {:handle_disconnect, {1011, "Oops"}}
+    assert_receive {:handle_disconnect, {:close, 1011, "Oops"}}
     assert_receive {:EXIT, ^pid, {:shutdown, {1011, "Oops"}}}
     refute Process.alive?(pid)
   end

@@ -323,7 +323,7 @@ defmodule Late do
     state = %{state | conn: conn}
 
     if function_exported?(mod, :handle_disconnect, 2) do
-      case apply(mod, :handle_disconnect, [{code, reason}, mod_state]) do
+      case apply(mod, :handle_disconnect, [{:close, code, reason}, mod_state]) do
         # TODO Add reconnect
         {:ok, mod_state} ->
           state = %{state | state: {mod, mod_state}}
